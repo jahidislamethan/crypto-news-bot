@@ -1,13 +1,15 @@
 import feedparser
 import requests
+import schedule
+import time
 import json
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
+
 API_KEY = os.getenv("BINANCE_API_KEY")
-API_URL = os.getenv("BINANCE_POST_ENDPOINT")
+API_URL = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
 
 RSS_FEEDS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
@@ -18,23 +20,80 @@ RSS_FEEDS = [
 
 POSTED_FILE = "posted.json"
 
+
 def load_posted():
     try:
         with open(POSTED_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except:
         return []
+
 
 def save_posted(data):
     with open(POSTED_FILE, "w") as f:
         json.dump(data, f)
 
+
 def format_post(title, link):
     return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
 
+
 def post_to_platform(content):
     headers = {
-        "x-api-key": API_KEY,
+        "x-mbx-apikey": API_KEY,  # Binance may use lowercase x-mbx-apikey
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "title": content.split("\n")[0],      # first line as title
+        "content": content,                   # full content
+        "type": 1                             # type might be required by Binance, 1 = article
+    }
+
+    try:
+        r = requests.post(API_URL, json=payload, headers=headers)
+        if r.status_code == 200:
+            print("Successfully posted:", payload["title"])
+        else:
+            print("Failed to post:", r.status_code, r.text)
+    except Exception as e:
+        print("ERROR:", e)
+
+
+def fetch_news():
+    posted = load_posted()
+
+    for feed_url in RSS_FEEDS:
+        feed = feedparser.parse(feed_url)
+
+        for entry in feed.entries[:3]:
+            title = entry.title
+            link = entry.link
+
+            if title not in posted:
+                content = format_post(title, link)
+
+                print("Posting:", title)
+                post_to_platform(content)
+
+                posted.append(title)
+                save_posted(posted)
+
+                time.sleep(20)  # delay between posts
+
+
+def run_bot():
+    print("Checking news...")
+    fetch_news()
+
+
+run_bot()
+
+schedule.every(15).minutes.do(run_bot)
+
+while True:
+    schedule.run_pending()
+    time.sleep(5)        "x-api-key": API_KEY,
         "Content-Type": "application/json"
     }
     payload = {
