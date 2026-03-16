@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("BINANCE_API_KEY")
-API_URL = "YOUR_BINANCE_POST_ENDPOINT"
+API_URL = os.getenv("BINANCE_POST_ENDPOINT")
 
 RSS_FEEDS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
@@ -35,31 +35,59 @@ def save_posted(data):
 
 
 def format_post(title, link):
-    return f"{title}\n\nread more: {link}\n\n#crypto #bitcoin"
+    return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
 
 
 def post_to_platform(content):
     headers = {
-        "X-API-KEY": API_KEY,
+        "x-api-key": API_KEY,
         "Content-Type": "application/json"
     }
 
-    payload = {"content": content}
+    payload = {
+        "content": content,
+        "title": content[:50],  # Binance usually requires a title
+        "tags": ["crypto", "bitcoin"]  # optional tags
+    }
 
     try:
         r = requests.post(API_URL, json=payload, headers=headers)
-        print("POST STATUS:", r.status_code)
+        print("POST STATUS:", r.status_code, r.text)
     except Exception as e:
         print("ERROR:", e)
 
 
 def fetch_news():
-
     posted = load_posted()
 
     for feed_url in RSS_FEEDS:
-
         feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:3]:
+            title = entry.title
+            link = entry.link
+
+            if title not in posted:
+                content = format_post(title, link)
+                print("Posting:", title)
+                post_to_platform(content)
+
+                posted.append(title)
+                save_posted(posted)
+
+                time.sleep(20)
+
+
+def run_bot():
+    print("Checking news...")
+    fetch_news()
+
+
+run_bot()
+schedule.every(15).minutes.do(run_bot)
+
+while True:
+    schedule.run_pending()
+    time.sleep(5)        feed = feedparser.parse(feed_url)
 
         for entry in feed.entries[:3]:
 
