@@ -1,7 +1,5 @@
 import feedparser
 import requests
-import schedule
-import time
 import json
 import os
 from dotenv import load_dotenv
@@ -11,7 +9,6 @@ load_dotenv()
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_URL = os.getenv("BINANCE_POST_ENDPOINT")
 
-# RSS feeds to fetch news from
 RSS_FEEDS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
@@ -19,11 +16,9 @@ RSS_FEEDS = [
     "https://www.theblock.co/rss.xml"
 ]
 
-# File to keep track of already posted titles
 POSTED_FILE = "posted.json"
 
 def load_posted():
-    """Load list of already posted titles."""
     try:
         with open(POSTED_FILE, "r") as f:
             return json.load(f)
@@ -31,10 +26,56 @@ def load_posted():
         return []
 
 def save_posted(data):
-    """Save list of posted titles to file."""
     with open(POSTED_FILE, "w") as f:
         json.dump(data, f)
 
+def format_post(title, link):
+    return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
+
+def post_to_platform(content):
+    headers = {
+        "x-api-key": API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "title": content[:50],
+        "content": content,
+        "tags": ["crypto", "bitcoin"]
+    }
+    try:
+        r = requests.post(API_URL, json=payload, headers=headers)
+        if r.status_code == 200:
+            print("POST SUCCESS:", r.status_code)
+        else:
+            print("POST FAILED:", r.status_code, r.text)
+    except Exception as e:
+        print("POST ERROR:", e)
+
+def fetch_and_post_news():
+    posted = load_posted()
+    new_posted = False
+
+    for feed_url in RSS_FEEDS:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:3]:
+            title = entry.title
+            link = entry.link
+
+            if title not in posted:
+                content = format_post(title, link)
+                print("Posting new news:", title)
+                post_to_platform(content)
+                posted.append(title)
+                new_posted = True
+
+    if new_posted:
+        save_posted(posted)
+        print("All new news posted.")
+    else:
+        print("No new news found.")
+
+if __name__ == "__main__":
+    fetch_and_post_news()
 def format_post(title, link):
     """Format the post content."""
     return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
