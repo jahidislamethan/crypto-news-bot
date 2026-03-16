@@ -6,12 +6,10 @@ import json
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_URL = os.getenv("BINANCE_POST_ENDPOINT")
 
-# RSS feeds to fetch news from
 RSS_FEEDS = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
@@ -19,7 +17,6 @@ RSS_FEEDS = [
     "https://www.theblock.co/rss.xml"
 ]
 
-# File to keep track of already posted titles
 POSTED_FILE = "posted.json"
 
 def load_posted():
@@ -35,6 +32,54 @@ def save_posted(data):
 
 def format_post(title, link):
     return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
+
+def post_to_platform(content):
+    headers = {
+        "x-api-key": API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "title": content[:50],
+        "content": content,
+        "tags": ["crypto", "bitcoin"]
+    }
+    try:
+        r = requests.post(API_URL, json=payload, headers=headers)
+        if r.status_code == 200:
+            print("POST SUCCESS:", r.status_code)
+        else:
+            print("POST FAILED:", r.status_code, r.text)
+    except Exception as e:
+        print("POST ERROR:", e)
+
+def fetch_news():
+    posted = load_posted()
+    for feed_url in RSS_FEEDS:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:3]:
+            title = entry.title
+            link = entry.link
+            if title not in posted:
+                content = format_post(title, link)
+                print("Posting:", title)
+                post_to_platform(content)
+                posted.append(title)
+                save_posted(posted)
+                time.sleep(10)
+
+def run_bot():
+    print("Checking news...")
+    fetch_news()
+
+# Run once at startup
+run_bot()
+
+# Schedule every 5 minutes
+schedule.every(5).minutes.do(run_bot)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)    return f"{title}\n\nRead more: {link}\n\n#crypto #bitcoin"
 
 def post_to_platform(content):
     headers = {
